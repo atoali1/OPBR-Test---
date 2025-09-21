@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>تحدّي أسئلة — Bounty Rush</title>
+  <style>
+    :root{
+      --bg-inner:#191d29;
+      --bg-outer:#070b14;
+      --blue:#3fa9f5;
+      --orange:#f7931e;
+      --teal:#2ee6d6;
+      --rose:#ff5a7a;
+      --text:#e6ecff;
+      --muted:#9bb0d0;
+      --card:#0f1422cc;
+      --shadow: 0 18px 44px rgba(0,0,0,.45), 0 8px 24px rgba(0,0,0,.35);
+      --radius:22px;
+      --border:1px solid rgba(255,255,255,.08);
+      --glow-blue:0 0 28px rgba(63,169,245,.55);
+      --glow-orange:0 0 28px rgba(247,147,30,.55);
+      --ok:#27d37b;
+      --bad:#ff5a7a;
+      --win:#2ee6d6;
+      --lose:#ff4d4d;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; color:var(--text);
+      background:none;
+      font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Noto Naskh Arabic UI", "Noto Sans Arabic", Tahoma, Arial, sans-serif;
+      overflow-x:hidden;
+    }
+    /* الخلفية: الصورة المغبشة تحت، والـ Radial Gradient الشفاف فوقها */
+    body::before, body::after{
+      content:""; position:fixed; inset:0; pointer-events:none;
+      z-index:-2;
+    }
+    body::before{
+      background: url('https://i.imgur.com/tPxbj4W.jpeg') center/cover no-repeat fixed;
+      filter: blur(16px) brightness(0.62) saturate(1.05);
+      transform: scale(1.06);
+    }
+    body::after{
+      z-index:-1;
+      background:
+        radial-gradient(circle at 50% 40%,
+          rgb(25 29 41 / 90%),
+          rgb(7 11 20 / 90%) 70%);
+    }
+
+    canvas#fx{
+      position:fixed; inset:0; width:100%; height:100%;
+      z-index:0; pointer-events:none; filter: blur(0.5px) brightness(1.05);
+      opacity:.55;
+    }
+
+    .wrap{
+      position:relative; z-index:1; min-height:100vh;
+      display:flex; align-items:center; justify-content:center;
+      padding:clamp(16px,2vw,32px);
+    }
+    .shell{width:min(1080px, 100%); display:flex; flex-direction:column; gap:22px;}
+
+    header.app{
+      display:flex; align-items:center; justify-content:space-between; gap:16px;
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.00));
+      border:var(--border); border-radius:16px;
+      padding:14px 16px; box-shadow: var(--shadow);
+      backdrop-filter: blur(10px) saturate(120%);
+      position:relative; overflow:hidden;
+    }
+    header.app::before{
+      content:""; position:absolute; inset:-2px;
+      background:
+        conic-gradient(from var(--spin,0deg),
+        rgba(63,169,245,.0) 0deg,
+        rgba(63,169,245,.35) 30deg,
+        rgba(247,147,30,.0) 120deg,
+        rgba(247,147,30,.35) 160deg,
+        rgba(63,169,245,.0) 260deg);
+      filter: blur(14px); opacity:.55; z-index:0; transition:opacity .3s ease;
+    }
+    header.app:hover::before{opacity:.8}
+
+    .brand{display:flex; align-items:center; gap:12px; position:relative; z-index:1}
+    .logo{
+      width:42px; height:42px; border-radius:12px; object-fit:cover;
+      box-shadow: var(--glow-blue), var(--glow-orange);
+      border:1px solid rgba(255,255,255,.12);
+      background:#0b1220;
+    }
+    h1{margin:0; font-size:clamp(18px, 2.6vw, 28px); letter-spacing:.2px; text-shadow: 0 2px 10px rgba(0,0,0,.5)}
+
+    .actions{display:flex; gap:10px; z-index:1}
+    .btn{
+      cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent;
+      background: linear-gradient(135deg, rgba(63,169,245,.2), rgba(247,147,30,.2));
+      color:var(--text); border:1px solid rgba(255,255,255,.12);
+      padding:12px 16px; border-radius:16px; font-weight:700;
+      font-size:15px;
+      transition: transform .15s ease, box-shadow .2s ease, background .3s ease, filter .3s ease;
+      box-shadow: var(--shadow);
+    }
+    .btn.primary{
+      background: linear-gradient(135deg, var(--blue), var(--orange));
+      box-shadow: 0 10px 30px rgba(63,169,245,.35), 0 10px 30px rgba(247,147,30,.35);
+      color:#07111f;
+    }
+    .btn:hover{transform: translateY(-2px); filter: brightness(1.08)}
+    .btn:active{transform: translateY(0)}
+
+    .card{
+      position:relative; overflow:hidden;
+      border-radius:var(--radius);
+      border:var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px) saturate(130%);
+      transform-style: preserve-3d; perspective: 1000px;
+      transition: transform .2s ease;
+    }
+    .card::before{
+      content:""; position:absolute; inset:-2px;
+      background: conic-gradient(from var(--spin,0deg), rgba(63,169,245,.08), rgba(247,147,30,.06), transparent 40%);
+      filter: blur(16px); pointer-events:none; mix-blend-mode: screen;
+      animation: spin 12s linear infinite;
+    }
+    @keyframes spin{to{transform: rotate(360deg)}}
+
+    .bar{display:flex; align-items:center; gap:12px; padding:16px 18px 0 18px}
+    .badge{
+      font-size:13px; padding:7px 12px; border-radius:999px;
+      background: linear-gradient(135deg, rgba(63,169,245,.2), rgba(247,147,30,.2));
+      border:1px solid rgba(255,255,255,.12);
+    }
+    .progress{flex:1; height:12px; border-radius:999px; overflow:hidden; background: rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.06)}
+    .progress .fill{
+      height:100%;
+      background: linear-gradient(90deg, var(--blue), var(--orange));
+      width:0%;
+      box-shadow: 0 0 16px rgba(63,169,245,.4), 0 0 16px rgba(247,147,30,.4) inset;
+      transition: width .5s cubic-bezier(.2,.8,.2,1);
+    }
+
+    .content{padding:22px 18px 22px 18px; display:flex; flex-direction:column; gap:18px}
+    .qtext{font-size:clamp(20px, 2.4vw, 30px); line-height:1.8; text-shadow: 0 2px 10px rgba(0,0,0,.5)}
+
+    .options{display:grid; gap:14px; grid-template-columns: repeat(3, 1fr)}
+    @media (max-width:980px){ .options{grid-template-columns: 1fr} }
+
+    .option{
+      position:relative; padding:18px 18px; border-radius:18px;
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow: var(--shadow);
+      transition: transform .15s ease, box-shadow .2s ease, background .3s ease, filter .3s ease;
+      cursor:pointer; font-weight:800; color:var(--text);
+      font-size:18px;
+    }
+    .option:hover{
+      transform: translateY(-3px);
+      box-shadow: 0 10px 26px rgba(63,169,245,.28), 0 10px 26px rgba(247,147,30,.28);
+      background: linear-gradient(180deg, rgba(63,169,245,.18), rgba(247,147,30,.10));
+    }
+    .option.correct{ outline:2px solid var(--ok); box-shadow: 0 0 24px rgba(39,211,123,.45);
+      background: linear-gradient(180deg, rgba(39,211,123,.25), rgba(39,211,123,.12)); }
+    .option.wrong{ outline:2px solid var(--bad); box-shadow: 0 0 24px rgba(255,90,122,.45);
+      background: linear-gradient(180deg, rgba(255,90,122,.25), rgba(255,90,122,.12)); }
+    .option.selected{ outline:2px solid rgba(63,169,245,.7); box-shadow: 0 0 18px rgba(63,169,245,.35) }
+
+    .foot{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 18px 18px 18px}
+    .muted{color:var(--muted); font-size:15px}
+    .next{min-width:140px}
+
+    .toast{
+      position:fixed; inset:auto 0 24px 0; margin-inline:auto; width:fit-content; max-width:calc(100% - 32px);
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:16px; padding:12px 16px; box-shadow: var(--shadow); backdrop-filter: blur(12px);
+      transform: translateY(20px); opacity:0; transition: all .3s ease; pointer-events:none;
+      font-size:15px; font-weight:700;
+    }
+    .toast.show{transform: translateY(0); opacity:1}
+
+    .tilt{ transform: perspective(1000px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); }
+
+    /* شاشة النهاية */
+    .result{
+      display:none; position:fixed; inset:0; z-index:2; place-items:center;
+      background: radial-gradient(circle at 50% 40%, rgba(0,0,0,.35), rgba(0,0,0,.75) 70%);
+      backdrop-filter: blur(6px);
+    }
+    .result.show{display:grid; animation: fadeIn .35s ease forwards}
+    @keyframes fadeIn{from{opacity:0} to{opacity:1}}
+
+    .result-card{
+      width:min(720px, 95%); border-radius:22px; padding:26px 22px;
+      border:1px solid rgba(255,255,255,.12);
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+      box-shadow: 0 20px 60px rgba(0,0,0,.5);
+      text-align:center; position:relative; overflow:hidden;
+    }
+    .result-card h2{margin:0 0 6px 0; font-size:clamp(22px,2.8vw,32px)}
+    .result-card p{margin:0 0 14px 0; color:var(--muted); font-size:16px}
+
+    /* أنميشن الفوز: confetti + pulse */
+    .win .result-card{ border-color: rgba(46,230,214,.4); box-shadow: 0 0 32px rgba(46,230,214,.35) }
+    .win .result-card::after{
+      content:""; position:absolute; inset:-40%;
+      background: conic-gradient(from 0deg,
+        rgba(46,230,214,.0) 0deg, rgba(46,230,214,.35) 60deg,
+        rgba(63,169,245,.0) 120deg, rgba(63,169,245,.35) 180deg,
+        rgba(247,147,30,.0) 240deg, rgba(247,147,30,.35) 300deg);
+      filter: blur(22px); animation: spin 4s linear infinite;
+      opacity:.55;
+    }
+    .win .score{color:var(--win)}
+    .win .result-card{animation: pulse 1.2s ease-in-out 2}
+    @keyframes pulse{50%{transform:scale(1.02)}}
+
+    /* أنميشن الخسارة: shake + glow أحمر */
+    .lose .result-card{ border-color: rgba(255,77,77,.35); box-shadow: 0 0 32px rgba(255,77,77,.28) }
+    .lose .score{color:var(--lose)}
+    .lose .result-card{animation: shake .5s ease-in-out 2}
+    @keyframes shake{
+      10%,90%{transform: translateX(-2px)}
+      20%,80%{transform: translateX(4px)}
+      30%,50%,70%{transform: translateX(-6px)}
+      40%,60%{transform: translateX(6px)}
+    }
+  </style>
+</head>
+<body>
+  <canvas id="fx"></canvas>
+  <div class="wrap">
+    <div class="shell">
+      <header class="app">
+        <div class="brand">
+          <img class="logo" src="https://i.imgur.com/mtJySbK.png" alt="Bounty Rush Icon" />
+          <h1>إختبر معلوماتك — Bounty Rush</h1>
+        </div>
+        <div class="actions">
+          <button id="startBtn" class="btn primary">ابدأ الآن</button>
+          <button id="resetBtn" class="btn">إعادة</button>
+        </div>
+      </header>
+
+      <section class="card tilt" id="card">
+        <div class="bar">
+          <span id="diff" class="badge">الصعوبة: —</span>
+          <div class="progress"><div id="fill" class="fill"></div></div>
+          <span id="count" class="badge">0 / 20</span>
+        </div>
+        <div class="content">
+          <div id="qtext" class="qtext">اضغط “ابدأ الآن” لبدء الاختبار.</div>
+          <div id="opts" class="options"></div>
+        </div>
+        <div class="foot">
+          <div class="muted" id="status">النتيجة: 0</div>
+          <button id="nextBtn" class="btn next" disabled>التالي</button>
+        </div>
+      </section>
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <!-- شاشة النتيجة -->
+  <div id="result" class="result" aria-modal="true" role="dialog">
+    <div class="result-card">
+      <h2 id="resTitle">النتيجة</h2>
+      <p id="resMsg">—</p>
+      <div class="score" id="resScore" style="font-size:32px; font-weight:900; margin:6px 0 14px 0">0 / 20</div>
+      <button id="playAgain" class="btn primary">لعبة جديدة</button>
+    </div>
+  </div>
+
+  <script>
+    // ---------------- Background particles ----------------
+    const canvas = document.getElementById('fx');
+    const ctx = canvas.getContext('2d');
+    let W=0,H=0, particles=[], mouse={x:0,y:0};
+    const colors=['#3fa9f5','#f7931e','#2ee6d6','#ff4d4d'];
+    function resize(){ W=canvas.width=innerWidth; H=canvas.height=innerHeight; }
+    addEventListener('resize', resize); resize();
+    function makeParticles(n=100){
+      particles=[];
+      for(let i=0;i<n;i++){
+        const r = Math.random()*1.8+0.6;
+        particles.push({ x: Math.random()*W, y: Math.random()*H, r,
+          vx: (Math.random()-.5)*.35, vy: (Math.random()-.5)*.35,
+          c: colors[(Math.random()*colors.length)|0], a: Math.random()*.6+.2 });
+      }
+    }
+    makeParticles(innerWidth<900?80:140);
+    function step(){
+      ctx.clearRect(0,0,W,H);
+      for(const p of particles){
+        p.x += p.vx + (mouse.x - W/2)*0.00002;
+        p.y += p.vy + (mouse.y - H/2)*0.00002;
+        if(p.x<-10) p.x=W+10; if(p.x>W+10) p.x=-10;
+        if(p.y<-10) p.y=H+10; if(p.y>H+10) p.y=-10;
+        const grd = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*6);
+        grd.addColorStop(0, p.c); grd.addColorStop(1, 'transparent');
+        ctx.fillStyle = grd; ctx.globalAlpha = p.a;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.r*3,0,Math.PI*2); ctx.fill(); ctx.globalAlpha = 1;
+      }
+      requestAnimationFrame(step);
+    }
+    step();
+    addEventListener('mousemove', e=>{ mouse.x=e.clientX; mouse.y=e.clientY; });
+
+    // ---------------- بنك الأسئلة (20 سؤال بالضبط مع التصحيحات) ----------------
+    const DIFF = {1:'سهل', 2:'متوسط', 3:'صعب', 4:'خبير'};
+    const questions = [
+      {d:1, q:'كم يحتاج منك بوست لكي توصل الشخصية للهايبر الرابع؟', o:['26/26','40/40','52/52','60/60'], a:[2]},
+	  {d:1, q:'كم هي عدد الاكستريمات المدافعة؟', o:['6','7','8','9'], a:[2]},
+      {d:1, q:'كم هي عدد الاكستريمات الرنر؟', o:['8','9','10','11'], a:[2]},
+	  {d:1, q:'أول شخصية اكستريم من فئة الرنر صدرت باللعبة هي؟', o:['اودن','كايدو','البيج مام','ياماتو'], a:[2]},
+	  {d:1, q:'كم هي عدد الاكستريمات الاتاكر؟', o:['9','10','11','12'], a:[1]},
+      {d:2, q:'كم تحتاج مطرقة لتطوير ميدالية كاملة من الصفر؟', o:['240','360','480','600'], a:[2]},
+      {d:2, q:'ما هو أعلى مضمون اكستريم باللعبة؟', o:['3850','3800','3600','3840'], a:[3]},
+	  {d:2, q:'التيم بوست لا يزيد من؟', o:['الهجوم','الدفاع','السرعة'], a:[1]},
+      {d:2, q:'كم هو مضمون اللحية البيضاء الاكستريم عند نزوله؟', o:['2800','3000','3200','3400'], a:[2]},
+      {d:2, q:'أي من هذه الشخصيات ليست شخصية ستيب أب؟', o:['ماجيلان','مستر 3','ايزو','فيستا'], a:[0]},
+      {d:2, q:'كم عملة سيزون بإمكانك الحصول عليها بالسيزن الواحد بشكل مجاني؟', o:['50','80','90','100'], a:[0]},
+      {d:3, q:'كم هي عدد الأيام اللازمة لتوصيل الشخصية للفل 100 باستعمال الركض؟', o:['217','187','207','250'], a:[2]},
+      {d:3, q:'كم عدد الجواهر التي تستطيع الحصول عليها من السولو؟', o:['968','1008','1108','1158'], a:[1]},
+      {d:3, q:'إذا مسكت شخصية نيجي العلم وكانت أرضية العلم مجمدة من أوكيجي، الذي سيحصل هو:', o:['ستبقى أرضية أوكيجي فعالة','ستتبدل الأرضية لأرضية نيجي','تبقى الأرضية نفس ما هي وتتفعل أرضية نيجي','تختفي الأرضيتان'], a:[1]},
+      {d:3, q:'أثناء استعمال سكل مخفي، الطريقة لإلغاء السكل هي:', o:['إعطاء تأثير له عن طريق خواص الشخصية','ضربه بالنورمال','ضربه بالسكلات','تركه'], a:[0]}, /* تم التصحيح */
+      {d:4, q:'كم هي عدد الشخصيات باللعبة إلى حد نزول بروك الإيجهيد؟', o:['300','317','330','345'], a:[2]},
+      {d:4, q:'ما هي الخاصية التي تكون مضادة لتجميعة الدفاع؟', o:['زيادة الضرر','تجاهل تقليل الضرر','الاتاك'], a:[2]},
+      {d:4, q:'ما هي الخاصية المضادة لزيادة الضرر؟', o:['تقليل الضرر','DEF'], a:[1]},
+      {d:4, q:'إذا كنت كالغارا وضربت شوجر ماذا سيحصل لك؟ (ملاحظة: تستطيع رؤية خواص الشخصيتين)', o:['ستتحول إلى دمية','سيقاوم كالغارا التأثير','لن يحدث شيء','ستزيد قوتك'], a:[0]}, /* تم التصحيح */
+      {d:4, q:'ما هي العوامل التي تزيد من نقاطك في الليج؟ (متعدد الإجابات)', o:['اللعب منفرداً','الفوز المتكرر','حصولك على الـMVP','اخذ اعلام اكثر'], a:[0,1,2], m:true},
+    ];
+    // المجموع = 20
+
+    // ---------------- محرك الاختبار مع شاشة نهاية متحركة ----------------
+    let idx=0, score=0, locked=false;
+    const total = questions.length;
+
+    const qtext = document.getElementById('qtext');
+    const optsEl = document.getElementById('opts');
+    const nextBtn = document.getElementById('nextBtn');
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const fill = document.getElementById('fill');
+    const count = document.getElementById('count');
+    const status = document.getElementById('status');
+    const diff = document.getElementById('diff');
+    const toast = document.getElementById('toast');
+    const card = document.getElementById('card');
+
+    const result = document.getElementById('result');
+    const resTitle = document.getElementById('resTitle');
+    const resMsg = document.getElementById('resMsg');
+    const resScore = document.getElementById('resScore');
+    const playAgain = document.getElementById('playAgain');
+
+    const selected = new Set();
+
+    function showToast(msg){
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(()=> toast.classList.remove('show'), 1200);
+    }
+    function updateProgress(){
+      const pct = (idx/total)*100;
+      fill.style.width = pct + '%';
+      count.textContent = `${idx} / ${total}`;
+      status.textContent = `النتيجة: ${score}`;
+    }
+
+    function arraysEqual(a,b){
+      if(a.length!==b.length) return false;
+      const s = new Set(a);
+      for(const x of b) if(!s.has(x)) return false;
+      return true;
+    }
+
+    function markOptions(correctIdxs, chosenIdxs){
+      const buttons = [...document.querySelectorAll('.option')];
+      buttons.forEach((b,bi)=>{
+        if(correctIdxs.includes(bi)) b.classList.add('correct');
+        if(chosenIdxs.includes(bi) && !correctIdxs.includes(bi)) b.classList.add('wrong');
+        b.style.pointerEvents='none';
+      });
+    }
+
+    function render(){
+      const q = questions[idx];
+      if(!q){
+        endGame();
+        return;
+      }
+      selected.clear(); locked=false;
+      diff.textContent = `الصعوبة: ${DIFF[q.d]||'—'}`;
+      qtext.textContent = q.q;
+      optsEl.innerHTML = '';
+
+      q.o.forEach((txt,i)=>{
+        const b = document.createElement('button');
+        b.className = 'option';
+        b.textContent = txt;
+        b.addEventListener('click', ()=>{
+          if(locked) return;
+          if(q.m){
+            if(selected.has(i)){ selected.delete(i); b.classList.remove('selected'); }
+            else { selected.add(i); b.classList.add('selected'); }
+            nextBtn.disabled = selected.size===0;
+          }else{
+            evaluate([i]);
+          }
+        });
+        optsEl.appendChild(b);
+      });
+
+      nextBtn.textContent = q.m ? 'تحقق' : 'التالي';
+      nextBtn.disabled = q.m ? true : true;
+      updateProgress();
+    }
+
+    function evaluate(choice){
+      const q = questions[idx];
+      const ans = q.a.slice().sort((a,b)=>a-b);
+      const chosen = choice.slice().sort((a,b)=>a-b);
+      markOptions(ans, chosen);
+      locked = true;
+      const isCorrect = arraysEqual(ans, chosen);
+      if(isCorrect){ score++; showToast(q.m ? 'كل الإجابات صحيحة!' : 'إجابة صحيحة!'); }
+      else{ showToast(q.m ? 'بعض الاختيارات خاطئة' : 'إجابة خاطئة!'); }
+      status.textContent = `النتيجة: ${score}`;
+      nextBtn.textContent = 'التالي';
+      nextBtn.disabled = false;
+    }
+
+    function endGame(){
+      // إظهار شاشة النتيجة مع أنميشن الفوز/الخسارة
+      const passed = score >= 11; // نجاح إذا ≥ 11 من 20
+      resTitle.textContent = passed ? 'مبروك! نجحت' : 'للأسف، لم تنجح';
+      resMsg.textContent = passed ? 'أداء رائع — استمر!' : 'حاول مرة أخرى، بالتوفيق!';
+      resScore.textContent = `${score} / ${total}`;
+
+      result.classList.remove('win','lose');
+      result.classList.add('show', passed ? 'win' : 'lose');
+
+      // وميض بسيط على شريط التقدّم عند النهاية
+      fill.style.transition = 'width .5s cubic-bezier(.2,.8,.2,1), box-shadow .6s ease';
+      fill.style.boxShadow = passed
+        ? '0 0 30px rgba(46,230,214,.7), 0 0 18px rgba(63,169,245,.6) inset'
+        : '0 0 30px rgba(255,77,77,.7), 0 0 18px rgba(247,147,30,.6) inset';
+    }
+
+    nextBtn.addEventListener('click', ()=>{
+      const q = questions[idx];
+      if(!q) return;
+      if(q.m && !locked){
+        if(selected.size===0){ showToast('اختر إجابة واحدة على الأقل'); return; }
+        evaluate([...selected]);
+        return;
+      }
+      if(locked){
+        idx++;
+        if(idx>=total){ endGame(); return; }
+        render();
+      }
+    });
+
+    startBtn.addEventListener('click', ()=>{
+      idx=0; score=0; locked=false; selected.clear();
+      fill.style.boxShadow='0 0 16px rgba(63,169,245,.4), 0 0 16px rgba(247,147,30,.4) inset';
+      render(); showToast('بالتوفيق!');
+    });
+    resetBtn.addEventListener('click', ()=>{
+      idx=0; score=0; locked=false; selected.clear();
+      qtext.textContent = 'اضغط “ابدأ الآن” لبدء الاختبار.';
+      optsEl.innerHTML=''; diff.textContent='الصعوبة: —';
+      fill.style.width='0%'; fill.style.boxShadow='0 0 16px rgba(63,169,245,.4), 0 0 16px rgba(247,147,30,.4) inset';
+      count.textContent=`0 / ${questions.length}`; status.textContent='النتيجة: 0';
+      result.classList.remove('show','win','lose');
+      showToast('تمت إعادة الضبط');
+    });
+    playAgain.addEventListener('click', ()=>{
+      result.classList.remove('show','win','lose');
+      idx=0; score=0; locked=false; selected.clear();
+      fill.style.width='0%';
+      fill.style.boxShadow='0 0 16px rgba(63,169,245,.4), 0 0 16px rgba(247,147,30,.4) inset';
+      render();
+    });
+
+    // tilt effect
+    (function bindTilt(el){
+      const strength = 8;
+      el.addEventListener('mousemove', (e)=>{
+        const r = el.getBoundingClientRect();
+        const cx = r.left + r.width/2, cy = r.top + r.height/2;
+        const dx = (e.clientX - cx) / (r.width/2);
+        const dy = (e.clientY - cy) / (r.height/2);
+        el.style.setProperty('--rx', `${(-dy*strength).toFixed(2)}deg`);
+        el.style.setProperty('--ry', `${(dx*strength).toFixed(2)}deg`);
+      });
+      el.addEventListener('mouseleave', ()=>{
+        el.style.setProperty('--rx', `0deg`);
+        el.style.setProperty('--ry', `0deg`);
+      });
+    })(document.getElementById('card'));
+
+    // gentle header spin
+    let spin=0; setInterval(()=> {
+      spin = (spin+1)%360;
+      document.documentElement.style.setProperty('--spin', spin+'deg');
+    }, 30);
+  </script>
+</body>
+</html>
